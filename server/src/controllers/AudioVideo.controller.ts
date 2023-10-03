@@ -1,45 +1,109 @@
-import { Request, Response } from 'express'
+import { Request, Response, NextFunction } from 'express'
+import multer from 'multer'
+import path from 'path'
+import { v4 } from 'uuid'
+import isValidFileType from '../shared'
+import CustomError from '../errors/CustomError'
 import db from '../utils/db'
 
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, '..', '..', 'tmp', 'uploads', 'files'),
+  filename: (request, file, cb) => {
+    const fileExtension = file.originalname.slice(
+      file.originalname.lastIndexOf('.'),
+    )
+
+    const filename = `${v4()}${fileExtension}`
+
+    cb(null, filename)
+  },
+})
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const { mimetype } = file
+
+    if (isValidFileType(mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new CustomError(400, 'Invalid file format'))
+    }
+  },
+})
+
+const uploadSingleFile = upload.single('file')
+
 export default {
-  async fileList(request: Request, response: Response) {
+  async save(request: Request, response: Response, next: NextFunction) {
+    uploadSingleFile(request, response, async (err) => {
+      if (err) {
+        return next(err)
+      }
+
+      const { file } = request
+
+      if (!file) {
+        return next(new CustomError(400, 'No file uploaded.'))
+      }
+
+      await db.files.create({
+        data: {
+          id: file.filename.slice(0, file.filename.indexOf('.')),
+          fileName: file.originalname,
+        },
+      })
+
+      return response.status(200).json({
+        filename: file?.filename,
+        mimetype: file?.mimetype,
+        originalname: file?.originalname,
+        size: file?.size,
+        fieldname: file?.fieldname,
+      })
+    })
+  },
+
+  async listFiles(request: Request, response: Response) {
     const files = await db.files.findMany()
-    return response.json(files)
+    return response.json({ files })
   },
 
   async getFile(request: Request, response: Response) {
-    // const files = await db.files.findMany()
     const { fileId } = request.params
-    console.log(typeof fileId)
-    return response.json({ msg: 'hi' })
-  },
 
-  async save(request: Request, response: Response) {
-    const { file } = request
-
-    if (!file) {
-      return response.status(400).json({ error: 'No file uploaded' })
-    }
-
-    await db.files.create({
-      data: {
-        id: file.filename.slice(0, file.filename.indexOf('.')),
-        fileName: file.originalname,
+    const files = await db.files.findUnique({
+      where: {
+        id: fileId,
       },
     })
-    // .then(async () => {
-    //   await db.$disconnect()
-    // })
-    // .catch(async (e) => {
-    //   console.error(e)
-    //   await db.$disconnect()
-    //   process.exit(1)
-    // })
 
-    console.log(file)
+    if (!files) {
+      return response
+        .status(400)
+        .json({ message: "Sorry, but there's no file with such id." })
+    }
 
-    return response.json({
-      msg: 'Upload successful',
-    })
+    // const filePath = path.join(
+    //   __dirname,
+    //   '..',
+    //   '..',
+    //   'tmp',
+    //   'uploads',
+    //   'files',
+    //   files.id,
+    // )
+
+    // Set the response headers
+
+    // Send the file as a response
+    // return response.sendFile(filePath, (err) => {
+    //   if (err) {
+    //     console.error(err)
+    //     response.status(500).send('Server Error')
+    //   }
+    // }).
+
+    return response.json({ files })
   },
 }
