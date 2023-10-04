@@ -1,7 +1,9 @@
 ## Setup steps
 
 ### Installing dependencies
-- npm i
+```bash
+ npm i
+```
 
 ### Environment variables
 - DATABASE_URL
