@@ -69,7 +69,7 @@ export default {
     return response.json({ files })
   },
 
-  async getFile(request: Request, response: Response) {
+  async getFile(request: Request, response: Response, next: NextFunction) {
     const { fileId } = request.params
 
     const files = await db.files.findUnique({
@@ -84,26 +84,32 @@ export default {
         .json({ message: "Sorry, but there's no file with such id." })
     }
 
-    // const filePath = path.join(
-    //   __dirname,
-    //   '..',
-    //   '..',
-    //   'tmp',
-    //   'uploads',
-    //   'files',
-    //   files.id,
-    // )
+    const fileName = path.join(
+      __dirname,
+      '..',
+      '..',
+      'tmp',
+      'uploads',
+      'files',
+      `${files.id}${files.fileName.slice(files.fileName.lastIndexOf('.'))}`,
+    )
 
-    // Set the response headers
-
-    // Send the file as a response
-    // return response.sendFile(filePath, (err) => {
-    //   if (err) {
-    //     console.error(err)
-    //     response.status(500).send('Server Error')
-    //   }
-    // }).
-
-    return response.json({ files })
+    return response.sendFile(
+      fileName,
+      {
+        dotfiles: 'deny',
+        headers: {
+          'x-timestamp': Date.now(),
+          'x-sent': true,
+        },
+      },
+      (err) => {
+        if (err) {
+          return next(new CustomError(500, 'Server Error'))
+        } else {
+          console.log('Sent: ', fileName)
+        }
+      },
+    )
   },
 }
