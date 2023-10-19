@@ -10,14 +10,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// model User {
-//   id       String @id @default(uuid())
-//   username String @unique
-//   password String
-// }
-
 model Files {
-  id        String   @unique
-  fileName  String
+  id        String   @id
+  filename  String
+  extension String
+  mimetype  String
+  size      BigInt
   createdAt DateTime @default(now())
 }
